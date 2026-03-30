@@ -122,10 +122,12 @@ struct ContentView: View {
                             AIConsoleSettingsSection()
                         }
                     }
-                    .transition(.opacity.combined(with: .move(edge: .bottom)))
+                    .transition(.opacity.combined(with: .move(edge: .trailing)))
                 }
                 .padding(28)
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
+            .id(selectedTab)
         }
         .background(
             ZStack {
