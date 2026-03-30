@@ -13,6 +13,8 @@
 FloatingTimers는 화면 위에 작은 원형 타이머 HUD와 AI 플로팅 메모를 띄워 놓을 수 있는 macOS 전용 앱입니다.
 모든 앱 위에 항상 표시되며 Space(데스크톱) 전환에도 따라다닙니다.
 
+> 🎯 **화면 공유·녹화에 보이지 않습니다.** Zoom, Google Meet, Teams 등으로 화면을 공유해도 HUD는 공유 화면에 나타나지 않습니다.
+
 ## ✨ 주요 기능
 
 ### 🕐 플로팅 타이머
@@ -28,10 +30,13 @@ FloatingTimers는 화면 위에 작은 원형 타이머 HUD와 AI 플로팅 메�
 - 메모별 기본 프롬프트 설정 가능
 - API 키 10개 슬롯 관리 (Keychain 보안 저장)
 
+### 🔒 화면 공유 · 녹화 안전
+- **Zoom, Meet, Teams 등 화면 공유 시 HUD가 보이지 않음** — 나만 볼 수 있음
+- Dock에 아이콘이 표시되지 않는 액세서리 앱 (LSUIElement)
+
 ### 🎨 UI/UX
 - 다크 모드 전용 glassmorphism 디자인
 - 투명도 조절 슬라이더
-- 화면 공유/녹화 시 HUD 자동 제외
 - 앱 상태 자동 저장/복원
 
 ---
@@ -139,6 +144,8 @@ AI 메모의 화면 캡처 기능을 사용하려면 **시스템 설정 → 개�
 
 FloatingTimers is a macOS-exclusive app that floats small circular timer HUDs and AI-powered memo cards on top of all windows. They follow you across Spaces and full-screen apps.
 
+> 🎯 **Invisible to screen sharing & recording.** HUDs are automatically excluded from Zoom, Google Meet, Teams, and other screen capture.
+
 ## ✨ Key Features
 
 ### 🕐 Floating Timers
@@ -154,10 +161,13 @@ FloatingTimers is a macOS-exclusive app that floats small circular timer HUDs an
 - Per-memo custom prompt configuration
 - Up to 10 API key slots (securely stored in Keychain)
 
+### 🔒 Screen Sharing Safe
+- **Invisible to Zoom, Meet, Teams screen sharing** — only you can see the HUDs
+- Runs as an accessory app (no Dock icon)
+
 ### 🎨 UI/UX
 - Dark mode glassmorphism design
 - Opacity slider for transparency control
-- Auto-excluded from screen sharing/recording
 - Auto-save and restore app state
 
 ## 🛠️ Build & Run
