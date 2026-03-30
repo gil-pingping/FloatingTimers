@@ -21,6 +21,22 @@ enum ContentViewHelpers {
     }
 }
 
+enum MainTab: String, CaseIterable, Identifiable {
+    case timers = "타이머 스튜디오"
+    case memos = "AI 메모 보드"
+    case control = "시스템 설정"
+
+    var id: String { rawValue }
+    
+    var systemImage: String {
+        switch self {
+        case .timers: return "stopwatch.fill"
+        case .memos: return "sparkles.rectangle.stack.fill"
+        case .control: return "gearshape.fill"
+        }
+    }
+}
+
 struct ContentView: View {
     @EnvironmentObject private var store: TimerStore
 
@@ -31,6 +47,7 @@ struct ContentView: View {
     @State private var pendingMemoImageData: Data?
     @State private var pendingMemoImageFilename: String?
     @State private var selectedTimerIDs: Set<UUID> = []
+    @State private var selectedTab: MainTab = .timers
 
     private var selectedTimerCount: Int {
         let activeTimerIDs = Set(store.timers.map(\.id))
@@ -38,29 +55,77 @@ struct ContentView: View {
     }
 
     var body: some View {
-        ScrollView(.vertical, showsIndicators: true) {
-            VStack(alignment: .leading, spacing: 22) {
-                HeaderSection()
-
-                CreateTimerSection(
-                    hours: $hours,
-                    minutes: $minutes,
-                    seconds: $seconds
-                )
-
-                timerListSection
-
-                GroupControlSection()
-
-                AIConsoleSettingsSection()
-
-                FloatingMemoSection(
-                    memoDraft: $memoDraft,
-                    pendingMemoImageData: $pendingMemoImageData,
-                    pendingMemoImageFilename: $pendingMemoImageFilename
-                )
+        VStack(spacing: 0) {
+            // 상단 탭 스위처
+            HStack(spacing: 12) {
+                ForEach(MainTab.allCases) { tab in
+                    Button {
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                            selectedTab = tab
+                        }
+                    } label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: tab.systemImage)
+                            Text(tab.rawValue)
+                        }
+                        .font(.system(size: 14, weight: .bold, design: .rounded))
+                        .foregroundStyle(selectedTab == tab ? .black : .white.opacity(0.6))
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 10)
+                        .background(
+                            Capsule(style: .continuous)
+                                .fill(selectedTab == tab ? Color(red: 0.63, green: 0.90, blue: 1.0) : Color.white.opacity(0.08))
+                        )
+                        .overlay(
+                            Capsule(style: .continuous)
+                                .stroke(Color.white.opacity(0.06), lineWidth: selectedTab == tab ? 0 : 1)
+                        )
+                    }
+                    .buttonStyle(.plain)
+                }
+                
+                Spacer()
+                
+                Button {
+                    NSApp.terminate(nil)
+                } label: {
+                    Label("종료", systemImage: "power")
+                }
+                .buttonStyle(DeleteActionButtonStyle())
             }
             .padding(28)
+            .background(Color.black.opacity(0.2))
+
+            // 메인 컴포넌트 스크롤 뷰
+            ScrollView(.vertical, showsIndicators: true) {
+                VStack(alignment: .leading, spacing: 22) {
+                    Group {
+                        switch selectedTab {
+                        case .timers:
+                            HeaderSection()
+                            CreateTimerSection(
+                                hours: $hours,
+                                minutes: $minutes,
+                                seconds: $seconds
+                            )
+                            timerListSection
+                            
+                        case .memos:
+                            FloatingMemoSection(
+                                memoDraft: $memoDraft,
+                                pendingMemoImageData: $pendingMemoImageData,
+                                pendingMemoImageFilename: $pendingMemoImageFilename
+                            )
+                            
+                        case .control:
+                            GroupControlSection()
+                            AIConsoleSettingsSection()
+                        }
+                    }
+                    .transition(.opacity.combined(with: .move(edge: .bottom)))
+                }
+                .padding(28)
+            }
         }
         .background(
             ZStack {
