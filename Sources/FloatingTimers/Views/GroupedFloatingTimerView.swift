@@ -288,7 +288,9 @@ struct GroupedFloatingTimerView: View {
     }
 
     private var minimizedBody: some View {
-        ZStack {
+        let theme = TimerColorTheme(state: visualState, hasAlert: hasCheckpointCompletion, isPulsing: isAlertPulsing)
+        
+        return ZStack {
             VisualEffectView(material: .hudWindow, blendingMode: .withinWindow)
                 .clipShape(Capsule())
                 .opacity(0.78)
@@ -297,8 +299,8 @@ struct GroupedFloatingTimerView: View {
                 .fill(
                     LinearGradient(
                         colors: [
-                            edgeColor.opacity(0.98),
-                            centerColor,
+                            theme.edgeColor.opacity(0.98),
+                            theme.centerColor,
                         ],
                         startPoint: .leading,
                         endPoint: .trailing
@@ -307,7 +309,7 @@ struct GroupedFloatingTimerView: View {
 
             HStack(spacing: 8) {
                 Circle()
-                    .fill(ringColor)
+                    .fill(theme.ringColor)
                     .frame(width: 6, height: 6)
 
                 Text(displayedTimeText)
@@ -328,11 +330,13 @@ struct GroupedFloatingTimerView: View {
             Capsule(style: .continuous)
                 .stroke(Color.white.opacity(0.10), lineWidth: 1)
         )
-        .shadow(color: haloColor, radius: 6)
+        .shadow(color: theme.haloColor, radius: 6)
     }
 
     private var clockBody: some View {
-        ZStack {
+        let theme = TimerColorTheme(state: visualState, hasAlert: hasCheckpointCompletion, isPulsing: isAlertPulsing)
+        
+        return ZStack {
             Circle()
                 .fill(Color.black.opacity(0.0001))
 
@@ -340,8 +344,8 @@ struct GroupedFloatingTimerView: View {
                 .fill(
                     RadialGradient(
                         colors: [
-                            centerColor,
-                            edgeColor,
+                            theme.centerColor,
+                            theme.edgeColor,
                         ],
                         center: .center,
                         startRadius: 8,
@@ -362,7 +366,7 @@ struct GroupedFloatingTimerView: View {
             Circle()
                 .trim(from: 0, to: max(displayedProgress, 0.015))
                 .stroke(
-                    ringColor,
+                    theme.ringColor,
                     style: StrokeStyle(lineWidth: 4.6, lineCap: .round)
                 )
                 .rotationEffect(.degrees(-90))
@@ -402,7 +406,7 @@ struct GroupedFloatingTimerView: View {
                 .padding(.horizontal, 12)
         }
         .frame(width: GroupedTimerHUDMetrics.expandedSide, height: GroupedTimerHUDMetrics.expandedSide)
-        .shadow(color: haloColor, radius: allFinished ? 14 : 7)
+        .shadow(color: theme.haloColor, radius: allFinished ? 14 : 7)
         .animation(.easeInOut(duration: 0.82), value: isAlertPulsing)
     }
 
@@ -445,65 +449,7 @@ struct GroupedFloatingTimerView: View {
         .frame(width: GroupedTimerHUDMetrics.expandedSide, height: GroupedTimerHUDMetrics.expandedSide)
     }
 
-    private var centerColor: Color {
-        switch visualState {
-        case .running:
-            return Color(red: 0.22, green: 0.25, blue: 0.30).opacity(0.94)
-        case .paused:
-            return Color(red: 0.32, green: 0.27, blue: 0.13).opacity(0.94)
-        case .idle:
-            return Color(red: 0.17, green: 0.20, blue: 0.25).opacity(0.94)
-        case .finished:
-            return Color(red: 0.66, green: 0.10, blue: 0.12).opacity(0.96)
-        }
-    }
 
-    private var edgeColor: Color {
-        switch visualState {
-        case .idle:
-            return Color(red: 0.07, green: 0.09, blue: 0.12).opacity(0.96)
-        case .running:
-            return Color(red: 0.08, green: 0.10, blue: 0.14).opacity(0.96)
-        case .paused:
-            return Color(red: 0.12, green: 0.10, blue: 0.04).opacity(0.96)
-        case .finished:
-            return Color(red: 0.19, green: 0.02, blue: 0.04).opacity(0.99)
-        }
-    }
-
-    private var ringColor: Color {
-        switch visualState {
-        case .idle:
-            return Color.white.opacity(0.24)
-        case .running:
-            return Color(red: 0.67, green: 0.92, blue: 1.00).opacity(0.96)
-        case .paused:
-            return Color(red: 0.98, green: 0.83, blue: 0.42).opacity(0.95)
-        case .finished:
-            return Color(red: 1.00, green: 0.26, blue: 0.22).opacity(0.98)
-        }
-    }
-
-    private var haloColor: Color {
-        if allFinished {
-            return Color.red.opacity(isAlertPulsing ? 0.58 : 0.22)
-        }
-
-        if hasCheckpointCompletion {
-            return Color.red.opacity(isAlertPulsing ? 0.18 : 0.08)
-        }
-
-        switch visualState {
-        case .running:
-            return Color.black.opacity(0.14)
-        case .paused:
-            return Color.yellow.opacity(0.08)
-        case .idle:
-            return Color.black.opacity(0.10)
-        case .finished:
-            return Color.red.opacity(0.22)
-        }
-    }
 
     private var fontSize: CGFloat {
         displayedWholeSeconds >= 3600 ? 20 : 24

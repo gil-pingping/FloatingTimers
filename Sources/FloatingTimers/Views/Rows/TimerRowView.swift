@@ -8,6 +8,13 @@ struct TimerRowView: View {
     let groupName: String?
     let onToggleSelection: () -> Void
 
+    @State private var isEditingName = false
+    @State private var editedName = ""
+    @State private var showDurationEditor = false
+    @State private var editHours = 0
+    @State private var editMinutes = 0
+    @State private var editSeconds = 0
+
     private var floatingSummary: String {
         if groupName != nil {
             if !store.areFloatingHUDsVisible {
@@ -28,6 +35,10 @@ struct TimerRowView: View {
         return "플로팅 HUD: 더블클릭 시작/멈춤, 우클릭 개별 메뉴, hover 최소화 지원"
     }
 
+    private var canEditDuration: Bool {
+        timer.state == .idle || timer.state == .paused
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack(alignment: .top, spacing: 12) {
@@ -40,9 +51,19 @@ struct TimerRowView: View {
 
                 VStack(alignment: .leading, spacing: 6) {
                     HStack(spacing: 8) {
-                        Text(timer.name)
-                            .font(.system(size: 18, weight: .bold, design: .rounded))
-                            .foregroundStyle(.white)
+                        if isEditingName {
+                            TextField("타이머 이름", text: $editedName)
+                                .textFieldStyle(.plain)
+                                .font(.system(size: 18, weight: .bold, design: .rounded))
+                                .foregroundStyle(.white)
+                                .onSubmit { commitNameEdit() }
+                                .onExitCommand { cancelNameEdit() }
+                        } else {
+                            Text(timer.name)
+                                .font(.system(size: 18, weight: .bold, design: .rounded))
+                                .foregroundStyle(.white)
+                                .onTapGesture(count: 2) { startNameEdit() }
+                        }
 
                         if let groupName {
                             Text(groupName)
@@ -78,6 +99,19 @@ struct TimerRowView: View {
                     .foregroundStyle(.white)
 
                 Spacer()
+
+                if canEditDuration {
+                    Button {
+                        prepareDurationEdit()
+                        showDurationEditor.toggle()
+                    } label: {
+                        Label("시간 수정", systemImage: "pencil.circle")
+                    }
+                    .buttonStyle(SecondaryActionButtonStyle())
+                    .popover(isPresented: $showDurationEditor, arrowEdge: .bottom) {
+                        durationEditorPopover
+                    }
+                }
 
                 Button("삭제") {
                     store.removeTimer(timer.id)
@@ -126,6 +160,62 @@ struct TimerRowView: View {
         )
     }
 
+    private var durationEditorPopover: some View {
+        VStack(spacing: 12) {
+            Text("시간 수정")
+                .font(.system(size: 14, weight: .bold, design: .rounded))
+
+            HStack(spacing: 8) {
+                VStack(spacing: 4) {
+                    Text("시")
+                        .font(.system(size: 10, weight: .bold, design: .rounded))
+                        .foregroundStyle(.secondary)
+                    Stepper("\(editHours)", value: $editHours, in: 0...23)
+                        .labelsHidden()
+                    Text("\(editHours)")
+                        .font(.system(size: 18, weight: .bold, design: .rounded))
+                        .monospacedDigit()
+                }
+
+                Text(":")
+                    .font(.system(size: 18, weight: .bold))
+
+                VStack(spacing: 4) {
+                    Text("분")
+                        .font(.system(size: 10, weight: .bold, design: .rounded))
+                        .foregroundStyle(.secondary)
+                    Stepper("\(editMinutes)", value: $editMinutes, in: 0...59)
+                        .labelsHidden()
+                    Text("\(editMinutes)")
+                        .font(.system(size: 18, weight: .bold, design: .rounded))
+                        .monospacedDigit()
+                }
+
+                Text(":")
+                    .font(.system(size: 18, weight: .bold))
+
+                VStack(spacing: 4) {
+                    Text("초")
+                        .font(.system(size: 10, weight: .bold, design: .rounded))
+                        .foregroundStyle(.secondary)
+                    Stepper("\(editSeconds)", value: $editSeconds, in: 0...59)
+                        .labelsHidden()
+                    Text("\(editSeconds)")
+                        .font(.system(size: 18, weight: .bold, design: .rounded))
+                        .monospacedDigit()
+                }
+            }
+
+            Button("적용") {
+                store.updateTimerDuration(timer.id, hours: editHours, minutes: editMinutes, seconds: editSeconds)
+                showDurationEditor = false
+            }
+            .buttonStyle(.borderedProminent)
+            .disabled(editHours == 0 && editMinutes == 0 && editSeconds == 0)
+        }
+        .padding(16)
+    }
+
     private var statusBadge: some View {
         Text(timer.state.label)
             .font(.system(size: 12, weight: .bold, design: .rounded))
@@ -171,5 +261,26 @@ struct TimerRowView: View {
         case .idle, .paused:
             store.start(timer.id)
         }
+    }
+
+    private func startNameEdit() {
+        editedName = timer.name
+        isEditingName = true
+    }
+
+    private func commitNameEdit() {
+        store.renameTimer(timer.id, name: editedName)
+        isEditingName = false
+    }
+
+    private func cancelNameEdit() {
+        isEditingName = false
+    }
+
+    private func prepareDurationEdit() {
+        let total = timer.remainingWholeSeconds
+        editHours = total / 3600
+        editMinutes = (total % 3600) / 60
+        editSeconds = total % 60
     }
 }

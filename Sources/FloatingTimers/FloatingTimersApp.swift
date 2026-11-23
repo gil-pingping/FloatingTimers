@@ -118,6 +118,29 @@ struct FloatingTimersApp: App {
                 .keyboardShortcut("r", modifiers: [.command, .shift])
             }
         }
+
+        MenuBarExtra("FloatingTimers", systemImage: "stopwatch") {
+            Button("메인 창 열기") {
+                mainWindowBridge.showMainWindow()
+            }
+            .keyboardShortcut("m", modifiers: [.command, .shift])
+            
+            Divider()
+            
+            Button(store.areFloatingHUDsVisible ? "플로팅 HUD 끄기" : "플로팅 HUD 켜기") {
+                store.toggleFloatingHUDsVisibility()
+            }
+            
+            Button("접힌 HUD 모두 복원") {
+                store.restoreAllFloatingUI()
+            }
+            
+            Divider()
+            
+            Button("앱 완전 종료") {
+                NSApp.terminate(nil)
+            }
+        }
     }
 }
 

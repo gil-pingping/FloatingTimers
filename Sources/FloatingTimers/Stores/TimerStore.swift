@@ -151,6 +151,41 @@ final class TimerStore: ObservableObject {
         return timer.id
     }
 
+    func renameTimer(_ id: UUID, name: String) {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            return
+        }
+
+        guard let index = timers.firstIndex(where: { $0.id == id }) else {
+            return
+        }
+
+        guard timers[index].name != trimmed else {
+            return
+        }
+
+        timers[index].name = trimmed
+        scheduleStateSave()
+    }
+
+    func updateTimerDuration(_ id: UUID, hours: Int, minutes: Int, seconds: Int) {
+        let totalSeconds = max(hours, 0) * 3600 + max(minutes, 0) * 60 + max(seconds, 0)
+        guard totalSeconds > 0 else {
+            return
+        }
+
+        updateTimer(id) { timer, _ in
+            guard timer.state == .idle || timer.state == .paused else {
+                return
+            }
+
+            timer.remainingDuration = TimeInterval(totalSeconds)
+            timer.state = .idle
+            timer.endDate = nil
+        }
+    }
+
     func timer(for id: UUID) -> TimerItem? {
         timers.first(where: { $0.id == id })
     }
@@ -610,6 +645,18 @@ final class TimerStore: ObservableObject {
 
     func removeMemoImage(_ id: UUID) {
         setMemoImage(id, imageData: nil)
+    }
+
+    func clearMemoConversation(_ id: UUID) {
+        guard let index = memos.firstIndex(where: { $0.id == id }) else {
+            return
+        }
+
+        cancelAIRequest(for: id)
+        memos[index].conversationEntries.removeAll()
+        memos[index].assistantStatus = .idle
+        memos[index].updatedAt = nowProvider()
+        scheduleStateSave()
     }
 
     func removeMemo(_ id: UUID) {

@@ -105,7 +105,9 @@ struct FloatingTimerView: View {
     }
 
     private func expandedBody(_ timer: TimerItem) -> some View {
-        ZStack {
+        let theme = TimerColorTheme(state: timer.state, hasAlert: false, isPulsing: isPulsing)
+        
+        return ZStack {
             ZStack {
                 Circle()
                     .fill(Color.black.opacity(0.0001))
@@ -131,8 +133,8 @@ struct FloatingTimerView: View {
                     .fill(
                         RadialGradient(
                             colors: [
-                                centerColor(for: timer),
-                                edgeColor(for: timer),
+                                theme.centerColor,
+                                theme.edgeColor,
                             ],
                             center: .center,
                             startRadius: 8,
@@ -150,7 +152,7 @@ struct FloatingTimerView: View {
                 Circle()
                     .trim(from: 0, to: max(timer.progress, 0.015))
                     .stroke(
-                        ringColor(for: timer),
+                        theme.ringColor,
                         style: StrokeStyle(lineWidth: 4.8, lineCap: .round)
                     )
                     .rotationEffect(.degrees(-90))
@@ -178,7 +180,7 @@ struct FloatingTimerView: View {
                     .shadow(color: timer.isFinished ? Color.red.opacity(isPulsing ? 0.68 : 0.24) : .clear, radius: timer.isFinished ? 10 : 0)
                     .padding(.horizontal, 14)
             }
-            .shadow(color: haloColor(for: timer, pulsing: isPulsing), radius: timer.isFinished ? 14 : 7)
+            .shadow(color: theme.haloColor, radius: timer.isFinished ? 14 : 7)
             .scaleEffect(timer.isFinished ? (isPulsing ? 1.01 : 0.99) : 1)
             .opacity(timer.isFinished ? (isPulsing ? 1 : 0.95) : 1)
             .padding(4)
@@ -215,7 +217,9 @@ struct FloatingTimerView: View {
     }
 
     private func minimizedBody(_ timer: TimerItem) -> some View {
-        ZStack {
+        let theme = TimerColorTheme(state: timer.state, hasAlert: false, isPulsing: isPulsing)
+        
+        return ZStack {
             VisualEffectView(material: .hudWindow, blendingMode: .withinWindow)
                 .clipShape(Capsule())
                 .opacity(0.78)
@@ -224,8 +228,8 @@ struct FloatingTimerView: View {
                 .fill(
                     LinearGradient(
                         colors: [
-                            edgeColor(for: timer).opacity(0.98),
-                            centerColor(for: timer),
+                            theme.edgeColor.opacity(0.98),
+                            theme.centerColor,
                         ],
                         startPoint: .leading,
                         endPoint: .trailing
@@ -234,9 +238,9 @@ struct FloatingTimerView: View {
 
             HStack(spacing: 8) {
                 Circle()
-                    .fill(ringColor(for: timer))
+                    .fill(theme.ringColor)
                     .frame(width: timer.isFinished ? 8 : 6, height: timer.isFinished ? 8 : 6)
-                    .shadow(color: ringColor(for: timer).opacity(0.42), radius: 4)
+                    .shadow(color: theme.ringColor.opacity(0.42), radius: 4)
 
                 Text(timer.remainingDurationText)
                     .font(.system(size: 14, weight: .bold, design: .rounded))
@@ -250,59 +254,7 @@ struct FloatingTimerView: View {
             Capsule(style: .continuous)
                 .stroke(Color.white.opacity(0.10), lineWidth: 1)
         )
-        .shadow(color: haloColor(for: timer, pulsing: isPulsing), radius: 6)
-    }
-
-    private func centerColor(for timer: TimerItem) -> Color {
-        switch timer.state {
-        case .running:
-            return Color(red: 0.22, green: 0.25, blue: 0.30).opacity(0.94)
-        case .paused:
-            return Color(red: 0.32, green: 0.27, blue: 0.13).opacity(0.94)
-        case .idle:
-            return Color(red: 0.17, green: 0.20, blue: 0.25).opacity(0.94)
-        case .finished:
-            return Color(red: 0.66, green: 0.10, blue: 0.12).opacity(0.96)
-        }
-    }
-
-    private func edgeColor(for timer: TimerItem) -> Color {
-        switch timer.state {
-        case .idle:
-            return Color(red: 0.07, green: 0.09, blue: 0.12).opacity(0.96)
-        case .running:
-            return Color(red: 0.08, green: 0.10, blue: 0.14).opacity(0.96)
-        case .paused:
-            return Color(red: 0.12, green: 0.10, blue: 0.04).opacity(0.96)
-        case .finished:
-            return Color(red: 0.19, green: 0.02, blue: 0.04).opacity(0.99)
-        }
-    }
-
-    private func ringColor(for timer: TimerItem) -> Color {
-        switch timer.state {
-        case .idle:
-            return Color.white.opacity(0.24)
-        case .running:
-            return Color(red: 0.67, green: 0.92, blue: 1.00).opacity(0.96)
-        case .paused:
-            return Color(red: 0.98, green: 0.83, blue: 0.42).opacity(0.95)
-        case .finished:
-            return Color(red: 1.00, green: 0.26, blue: 0.22).opacity(0.98)
-        }
-    }
-
-    private func haloColor(for timer: TimerItem, pulsing: Bool) -> Color {
-        switch timer.state {
-        case .finished:
-            return Color.red.opacity(pulsing ? 0.62 : 0.22)
-        case .running:
-            return Color.black.opacity(0.14)
-        case .paused:
-            return Color.yellow.opacity(0.08)
-        case .idle:
-            return Color.black.opacity(0.10)
-        }
+        .shadow(color: theme.haloColor, radius: 6)
     }
 
     private func fontSize(for timer: TimerItem) -> CGFloat {
