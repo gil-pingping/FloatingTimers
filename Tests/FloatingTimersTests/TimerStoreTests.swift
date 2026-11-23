@@ -297,20 +297,19 @@ final class TimerStoreTests: XCTestCase {
         XCTAssertEqual(store.openAIAPIKey, "slot-1-key")
     }
 
-    func testPersistentAISettingsStoreFallsBackToUserDefaultsKeys() {
+    private func makeIsolatedDefaults() -> (UserDefaults, String) {
         let suiteName = "FloatingTimersTests.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
         defaults.removePersistentDomain(forName: suiteName)
-        defer {
-            defaults.removePersistentDomain(forName: suiteName)
-        }
+        return (defaults, suiteName)
+    }
 
-        let store = PersistentAISettingsStore(
-            userDefaults: defaults,
-            keychain: InMemoryKeychainStore()
-        )
+    func testPersistentAISettingsStoreKeepsKeysOnlyInKeychain() {
+        let (defaults, suiteName) = makeIsolatedDefaults()
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let keychain = InMemoryKeychainStore()
 
-        store.save(
+        PersistentAISettingsStore(userDefaults: defaults, keychain: keychain).save(
             AISettingsSnapshot(
                 provider: .gemini,
                 openAIModel: "gpt-test",
@@ -322,15 +321,63 @@ final class TimerStoreTests: XCTestCase {
             )
         )
 
-        let reloaded = PersistentAISettingsStore(
-            userDefaults: defaults,
-            keychain: InMemoryKeychainStore()
-        ).load()
+        // 평문 키가 UserDefaults 어디에도 남지 않아야 한다.
+        let persistedValues = defaults.persistentDomain(forName: suiteName) ?? [:]
+        let flattened = persistedValues.values.map { "\($0)" }.joined(separator: "|")
+        XCTAssertFalse(flattened.contains("open-key-1"))
+        XCTAssertFalse(flattened.contains("gemini-key"))
+        XCTAssertEqual(keychain.string(for: "ai.gemini.key.1"), "gemini-key-2")
 
+        let reloaded = PersistentAISettingsStore(userDefaults: defaults, keychain: keychain).load()
         XCTAssertEqual(reloaded.openAIAPIKeys[0], "open-key-1")
         XCTAssertEqual(reloaded.geminiAPIKeys[0], "gemini-key-1")
         XCTAssertEqual(reloaded.geminiAPIKeys[1], "gemini-key-2")
         XCTAssertEqual(reloaded.selectedGeminiKeySlot, 1)
+        XCTAssertEqual(reloaded.provider, .gemini)
+    }
+
+    func testPersistentAISettingsStoreMigratesLegacyPlaintextKeys() {
+        let (defaults, suiteName) = makeIsolatedDefaults()
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let keychain = InMemoryKeychainStore()
+        defaults.set(["legacy-open"], forKey: "ai.openai.keys")
+        defaults.set(["", "legacy-gemini"], forKey: "ai.gemini.keys")
+
+        let loaded = PersistentAISettingsStore(userDefaults: defaults, keychain: keychain).load()
+
+        XCTAssertEqual(loaded.openAIAPIKeys[0], "legacy-open")
+        XCTAssertEqual(loaded.geminiAPIKeys[1], "legacy-gemini")
+        XCTAssertEqual(keychain.string(for: "ai.openai.key.0"), "legacy-open")
+        XCTAssertEqual(keychain.string(for: "ai.gemini.key.1"), "legacy-gemini")
+        XCTAssertNil(defaults.object(forKey: "ai.openai.keys"))
+        XCTAssertNil(defaults.object(forKey: "ai.gemini.keys"))
+    }
+
+    func testPersistentAISettingsStoreKeepsLegacyKeysWhenKeychainWriteFails() {
+        let (defaults, suiteName) = makeIsolatedDefaults()
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let keychain = InMemoryKeychainStore()
+        keychain.failWrites = true
+        defaults.set(["legacy-open"], forKey: "ai.openai.keys")
+
+        let loaded = PersistentAISettingsStore(userDefaults: defaults, keychain: keychain).load()
+
+        // Keychain 저장에 실패하면 키를 잃지 않도록 레거시 값을 유지한다.
+        XCTAssertEqual(loaded.openAIAPIKeys[0], "legacy-open")
+        XCTAssertEqual(defaults.stringArray(forKey: "ai.openai.keys")?.first, "legacy-open")
+    }
+
+    func testPersistentAISettingsStoreMigratesLegacySingleKeychainItem() {
+        let (defaults, suiteName) = makeIsolatedDefaults()
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let keychain = InMemoryKeychainStore()
+        keychain.set("old-single", for: "ai.openai.key")
+
+        let loaded = PersistentAISettingsStore(userDefaults: defaults, keychain: keychain).load()
+
+        XCTAssertEqual(loaded.openAIAPIKeys[0], "old-single")
+        XCTAssertEqual(keychain.string(for: "ai.openai.key.0"), "old-single")
+        XCTAssertNil(keychain.string(for: "ai.openai.key"))
     }
 
     func testLegacyGeminiModelAliasIsNormalizedOnLoad() {
@@ -786,15 +833,18 @@ private final class InMemoryKeychainStore: KeychainStoring {
         storage[account]
     }
 
-    func strings() -> [String: String] {
-        storage
-    }
+    var failWrites = false
 
-    func set(_ value: String, for account: String) {
+    @discardableResult
+    func set(_ value: String, for account: String) -> Bool {
+        guard !failWrites else {
+            return false
+        }
         if value.isEmpty {
             storage.removeValue(forKey: account)
         } else {
             storage[account] = value
         }
+        return true
     }
 }
