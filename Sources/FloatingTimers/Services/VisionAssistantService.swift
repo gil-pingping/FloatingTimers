@@ -205,14 +205,16 @@ final class VisionAssistantService: VisionAssistantStreaming, @unchecked Sendabl
             ],
         ]
 
-        var components = URLComponents(string: "https://generativelanguage.googleapis.com/v1beta/models/\(model):streamGenerateContent")!
-        components.queryItems = [
-            URLQueryItem(name: "alt", value: "sse"),
-            URLQueryItem(name: "key", value: apiKey),
-        ]
+        // API 키는 URL 쿼리(?key=) 대신 헤더로 전달한다. URL은 로그·프록시·크래시 리포트에 남기 쉽다.
+        var components = URLComponents(string: "https://generativelanguage.googleapis.com/v1beta/models/\(model):streamGenerateContent")
+        components?.queryItems = [URLQueryItem(name: "alt", value: "sse")]
+        guard let url = components?.url else {
+            throw VisionAssistantError.serviceError("Gemini 모델 이름이 올바르지 않습니다: \(model)")
+        }
 
-        var request = URLRequest(url: components.url!)
+        var request = URLRequest(url: url)
         request.httpMethod = "POST"
+        request.setValue(apiKey, forHTTPHeaderField: "x-goog-api-key")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("text/event-stream", forHTTPHeaderField: "Accept")
         request.httpBody = try JSONSerialization.data(withJSONObject: payload)
