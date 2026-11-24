@@ -72,6 +72,24 @@ struct FloatingMemoView: View {
 
                         Divider()
 
+                        Menu("메모 색상") {
+                            ForEach(MemoTintPreset.allCases) { preset in
+                                Button {
+                                    store.setMemoTint(memo.id, tint: preset.tint)
+                                } label: {
+                                    Label(preset.label, systemImage: memo.tint == preset.tint ? "checkmark.circle.fill" : "circle.fill")
+                                }
+                            }
+                        }
+
+                        if !memo.conversationEntries.isEmpty {
+                            Button("대화 초기화") {
+                                store.clearMemoConversation(memo.id)
+                            }
+                        }
+
+                        Divider()
+
                         Button("메모 삭제", role: .destructive) {
                             store.removeMemo(memo.id)
                         }
@@ -150,17 +168,34 @@ struct FloatingMemoView: View {
 
     private func answerSection(for memo: MemoItem) -> some View {
         let accent = accentColor(for: memo)
-        let scrollIdentity = memo.latestResponseEntry?.id.uuidString ?? "empty-\(memo.assistantStatus.rawValue)"
+        let entryCount = memo.conversationEntries.count
+        let statusKey = memo.assistantStatus.rawValue
 
-        return ScrollView {
-            Text(latestResponseText(for: memo))
-                .font(.system(size: memo.fontSize, weight: .medium, design: .monospaced))
-                .foregroundStyle(latestResponseForegroundColor(for: memo))
-                .textSelection(.enabled)
-                .frame(maxWidth: .infinity, alignment: .topLeading)
-                .padding(10)
+        return ScrollViewReader { proxy in
+            ScrollView {
+                if memo.conversationEntries.isEmpty {
+                    Text(placeholderText(for: memo))
+                        .font(.system(size: memo.fontSize, weight: .medium, design: .monospaced))
+                        .foregroundStyle(.white.opacity(0.34))
+                        .frame(maxWidth: .infinity, alignment: .topLeading)
+                        .padding(10)
+                } else {
+                    LazyVStack(alignment: .leading, spacing: 8) {
+                        ForEach(memo.conversationEntries) { entry in
+                            conversationBubble(entry: entry, memo: memo)
+                                .id(entry.id)
+                        }
+                    }
+                    .padding(8)
+                }
+            }
+            .onChange(of: entryCount) { _, _ in
+                scrollToBottom(proxy: proxy, memo: memo)
+            }
+            .onChange(of: statusKey) { _, _ in
+                scrollToBottom(proxy: proxy, memo: memo)
+            }
         }
-        .id(scrollIdentity)
         .background(
             RoundedRectangle(cornerRadius: FloatingMemoMetrics.transcriptCornerRadius, style: .continuous)
                 .fill(Color.black.opacity(0.12))
@@ -170,6 +205,77 @@ struct FloatingMemoView: View {
                 .stroke(accent.opacity(0.08), lineWidth: 1)
         )
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private func scrollToBottom(proxy: ScrollViewProxy, memo: MemoItem) {
+        if let lastEntry = memo.conversationEntries.last {
+            withAnimation(.easeOut(duration: 0.2)) {
+                proxy.scrollTo(lastEntry.id, anchor: .bottom)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func conversationBubble(entry: MemoConversationEntry, memo: MemoItem) -> some View {
+        let isUser = entry.role == .userPrompt || entry.role == .userCapture
+        let isError = entry.role == .systemError
+        let accent = accentColor(for: memo)
+
+        HStack {
+            if isUser { Spacer(minLength: 20) }
+
+            VStack(alignment: isUser ? .trailing : .leading, spacing: 4) {
+                HStack(spacing: 4) {
+                    if entry.role == .userCapture {
+                        Image(systemName: "camera.fill")
+                            .font(.system(size: 8, weight: .bold))
+                    }
+                    Text(entry.role.label)
+                        .font(.system(size: 8, weight: .black, design: .rounded))
+                }
+                .foregroundStyle(bubbleLabelColor(isUser: isUser, isError: isError, accent: accent))
+
+                Text(entry.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                     ? (entry.isStreaming ? "…" : "(empty)")
+                     : entry.text.trimmingCharacters(in: .whitespacesAndNewlines))
+                    .font(.system(size: memo.fontSize, weight: .medium, design: isUser ? .rounded : .monospaced))
+                    .foregroundStyle(bubbleTextColor(isUser: isUser, isError: isError))
+                    .textSelection(.enabled)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 6)
+            .background(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(bubbleBackground(isUser: isUser, isError: isError, accent: accent))
+            )
+
+            if !isUser { Spacer(minLength: 20) }
+        }
+    }
+
+    private func bubbleLabelColor(isUser: Bool, isError: Bool, accent: Color) -> Color {
+        if isError { return Color(red: 1.0, green: 0.58, blue: 0.52).opacity(0.82) }
+        if isUser { return accent.opacity(0.72) }
+        return .white.opacity(0.48)
+    }
+
+    private func bubbleTextColor(isUser: Bool, isError: Bool) -> Color {
+        if isError { return Color(red: 1.0, green: 0.58, blue: 0.52) }
+        return .white.opacity(isUser ? 0.88 : 0.92)
+    }
+
+    private func bubbleBackground(isUser: Bool, isError: Bool, accent: Color) -> Color {
+        if isError { return Color(red: 0.4, green: 0.08, blue: 0.06).opacity(0.42) }
+        if isUser { return accent.opacity(0.12) }
+        return Color.white.opacity(0.04)
+    }
+
+    private func placeholderText(for memo: MemoItem) -> String {
+        if memo.assistantStatus == .requesting || memo.assistantStatus == .streaming || memo.assistantStatus == .capturing {
+            return "응답 대기 중..."
+        }
+        return "답변 없음"
     }
 
     private func questionComposer(for memo: MemoItem) -> some View {
@@ -297,37 +403,6 @@ struct FloatingMemoView: View {
         store.submitTextPrompt(trimmed, to: memo.id)
     }
 
-    private func latestResponseText(for memo: MemoItem) -> String {
-        if let latestResponseEntry = memo.latestResponseEntry {
-            let trimmed = latestResponseEntry.text.trimmingCharacters(in: .whitespacesAndNewlines)
-            if !trimmed.isEmpty {
-                return trimmed
-            }
-        }
-
-        if memo.assistantStatus == .requesting || memo.assistantStatus == .streaming || memo.assistantStatus == .capturing {
-            return "응답 대기 중..."
-        }
-
-        return "답변 없음"
-    }
-
-    private func latestResponseForegroundColor(for memo: MemoItem) -> Color {
-        guard let latestResponseEntry = memo.latestResponseEntry else {
-            if memo.assistantStatus == .requesting || memo.assistantStatus == .streaming || memo.assistantStatus == .capturing {
-                return accentColor(for: memo).opacity(0.88)
-            }
-
-            return .white.opacity(0.34)
-        }
-
-        switch latestResponseEntry.role {
-        case .systemError:
-            return Color(red: 1.0, green: 0.58, blue: 0.52)
-        default:
-            return .white.opacity(0.92)
-        }
-    }
 
     private func accentColor(for memo: MemoItem) -> Color {
         Color(

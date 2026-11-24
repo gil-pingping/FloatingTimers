@@ -22,7 +22,7 @@ enum TimerState: String, CaseIterable, Codable {
 
 struct TimerItem: Identifiable, Equatable, Codable {
     let id: UUID
-    let name: String
+    var name: String
     let configuredDurationText: String
     let createdAt: Date
     let initialDuration: TimeInterval

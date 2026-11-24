@@ -28,6 +28,39 @@ struct MemoTint: Equatable, Codable {
     }
 }
 
+enum MemoTintPreset: String, CaseIterable, Identifiable {
+    case amber
+    case blue
+    case green
+    case purple
+    case rose
+    case teal
+
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .amber: return "앰버"
+        case .blue: return "블루"
+        case .green: return "그린"
+        case .purple: return "퍼플"
+        case .rose: return "로즈"
+        case .teal: return "틸"
+        }
+    }
+
+    var tint: MemoTint {
+        switch self {
+        case .amber: return MemoTint(red: 0.46, green: 0.36, blue: 0.24)
+        case .blue: return MemoTint(red: 0.24, green: 0.42, blue: 0.68)
+        case .green: return MemoTint(red: 0.22, green: 0.52, blue: 0.34)
+        case .purple: return MemoTint(red: 0.44, green: 0.28, blue: 0.62)
+        case .rose: return MemoTint(red: 0.62, green: 0.28, blue: 0.36)
+        case .teal: return MemoTint(red: 0.18, green: 0.48, blue: 0.52)
+        }
+    }
+}
+
 struct MemoItem: Identifiable, Equatable {
     static let defaultExpandedWidth: CGFloat = 232
     static let defaultExpandedHeight: CGFloat = 252
