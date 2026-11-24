@@ -206,7 +206,9 @@ final class VisionAssistantService: VisionAssistantStreaming, @unchecked Sendabl
         ]
 
         // API 키는 URL 쿼리(?key=) 대신 헤더로 전달한다. URL은 로그·프록시·크래시 리포트에 남기 쉽다.
-        guard let url = URL(string: "https://generativelanguage.googleapis.com/v1beta/models/\(model):generateContent") else {
+        var components = URLComponents(string: "https://generativelanguage.googleapis.com/v1beta/models/\(model):streamGenerateContent")
+        components?.queryItems = [URLQueryItem(name: "alt", value: "sse")]
+        guard let url = components?.url else {
             throw VisionAssistantError.serviceError("Gemini 모델 이름이 올바르지 않습니다: \(model)")
         }
 
@@ -214,47 +216,37 @@ final class VisionAssistantService: VisionAssistantStreaming, @unchecked Sendabl
         request.httpMethod = "POST"
         request.setValue(apiKey, forHTTPHeaderField: "x-goog-api-key")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.setValue("text/event-stream", forHTTPHeaderField: "Accept")
         request.httpBody = try JSONSerialization.data(withJSONObject: payload)
 
-        let (data, response) = try await session.data(for: request)
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw VisionAssistantError.serviceError("응답 정보를 확인할 수 없습니다.")
+        var emittedText = false
+        try await consumeSSE(from: request, provider: .gemini, model: model) { eventData in
+            guard let json = try JSONSerialization.jsonObject(with: Data(eventData.utf8)) as? [String: Any] else {
+                return
+            }
+
+            if let error = json["error"] as? [String: Any] {
+                let message = (error["message"] as? String) ?? "Gemini 요청에 실패했습니다."
+                throw VisionAssistantError.serviceError(message)
+            }
+
+            if
+                let promptFeedback = json["promptFeedback"] as? [String: Any],
+                let blockReason = promptFeedback["blockReason"] as? String
+            {
+                throw VisionAssistantError.serviceError("Gemini가 요청을 차단했습니다: \(blockReason)")
+            }
+
+            let text = self.geminiDelta(from: json)
+            if !text.isEmpty {
+                emittedText = true
+                onDelta(text)
+            }
         }
 
-        if !(200 ..< 300).contains(httpResponse.statusCode) {
-            let message = String(data: data, encoding: .utf8) ?? "응답 본문 없음"
-            throw friendlyHTTPError(
-                statusCode: httpResponse.statusCode,
-                message: message,
-                provider: .gemini,
-                model: model
-            )
-        }
-
-        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-            let raw = String(data: data, encoding: .utf8) ?? "응답 디코딩 실패"
-            throw VisionAssistantError.serviceError("Gemini 응답 형식을 해석하지 못했습니다. 원본 응답: \(raw)")
-        }
-
-        if let error = json["error"] as? [String: Any] {
-            let message = (error["message"] as? String) ?? "Gemini 요청에 실패했습니다."
-            throw VisionAssistantError.serviceError(message)
-        }
-
-        if
-            let promptFeedback = json["promptFeedback"] as? [String: Any],
-            let blockReason = promptFeedback["blockReason"] as? String
-        {
-            throw VisionAssistantError.serviceError("Gemini가 요청을 차단했습니다: \(blockReason)")
-        }
-
-        let text = geminiDelta(from: json)
-        guard !text.isEmpty else {
+        guard emittedText else {
             throw VisionAssistantError.emptyResponse
         }
-
-        onDelta(text)
     }
 
     private func consumeSSE(

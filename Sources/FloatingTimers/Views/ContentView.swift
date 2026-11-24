@@ -99,34 +99,36 @@ struct ContentView: View {
             // 메인 컴포넌트 스크롤 뷰
             ScrollView(.vertical, showsIndicators: true) {
                 VStack(alignment: .leading, spacing: 22) {
-                    Group {
-                        switch selectedTab {
-                        case .timers:
-                            HeaderSection()
-                            CreateTimerSection(
-                                hours: $hours,
-                                minutes: $minutes,
-                                seconds: $seconds
-                            )
-                            timerListSection
-                            
-                        case .memos:
-                            FloatingMemoSection(
-                                memoDraft: $memoDraft,
-                                pendingMemoImageData: $pendingMemoImageData,
-                                pendingMemoImageFilename: $pendingMemoImageFilename
-                            )
-                            
-                        case .control:
-                            GroupControlSection()
-                            AIConsoleSettingsSection()
-                        }
+                    switch selectedTab {
+                    case .timers:
+                        HeaderSection()
+                        CreateTimerSection(
+                            hours: $hours,
+                            minutes: $minutes,
+                            seconds: $seconds
+                        )
+                        timerListSection
+                        
+                    case .memos:
+                        FloatingMemoSection(
+                            memoDraft: $memoDraft,
+                            pendingMemoImageData: $pendingMemoImageData,
+                            pendingMemoImageFilename: $pendingMemoImageFilename
+                        )
+                        
+                    case .control:
+                        GroupControlSection()
+                        AIConsoleSettingsSection()
                     }
-                    .transition(.opacity.combined(with: .move(edge: .trailing)))
+                    
+                    // 하단 여백 — 맨 아래 콘텐츠가 잘리지 않도록
+                    Color.clear.frame(height: 40)
                 }
-                .padding(28)
+                .padding(.horizontal, 28)
+                .padding(.top, 28)
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
+            .scrollContentBackground(.hidden)
             .id(selectedTab)
         }
         .background(
